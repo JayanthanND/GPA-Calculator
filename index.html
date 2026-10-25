@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GPA Calculator</title>
+<meta name="description" content="Calculate your GPA on a 10-point scale. Type credits and grades, see the result update as you go. Works offline.">
+<meta name="theme-color" content="#262b66">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23262b66'/%3E%3Ctext x='32' y='43' font-size='32' font-family='Georgia,serif' font-weight='700' text-anchor='middle' fill='%23f2b134'%3EG%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #eef0f6;
+    --surface: #ffffff;
+    --surface-2: #f4f5fa;
+    --ink: #181c3a;
+    --muted: #5f6585;
+    --line: #dde0ec;
+    --brand: #262b66;
+    --brand-ink: #ffffff;
+    --accent: #f2b134;
+    --danger: #c0392b;
+    --danger-bg: #fdecea;
+    --ok: #17794f;
+    --shadow: 0 1px 2px rgba(24,28,58,.06), 0 8px 28px rgba(24,28,58,.08);
+    --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #0f1226;
+      --surface: #181c3a;
+      --surface-2: #20254a;
+      --ink: #eceefa;
+      --muted: #a3a9cb;
+      --line: #2e3463;
+      --brand: #f2b134;
+      --brand-ink: #181c3a;
+      --accent: #f2b134;
+      --danger: #ff8a7a;
+      --danger-bg: #3a1f2a;
+      --ok: #5fd9a0;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 28px rgba(0,0,0,.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.45;
+    padding: 20px 16px calc(112px + env(safe-area-inset-bottom));
+  }
+  .wrap { max-width: 560px; margin: 0 auto; }
+  button, input { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  header { padding: 8px 4px 20px; }
+  h1 {
+    font-family: var(--serif);
+    font-size: clamp(2rem, 8vw, 2.6rem);
+    line-height: 1.05;
+    margin: 0 0 6px;
+    letter-spacing: -.01em;
+  }
+  header p { margin: 0; color: var(--muted); max-width: 40ch; }
+
+  .card {
+    background: var(--surface);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+
+  /* Subject count */
+  .count { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .count label { font-weight: 600; }
+  .stepper {
+    display: flex; align-items: center;
+    background: var(--surface-2); border-radius: 14px; padding: 4px;
+  }
+  .stepper button {
+    width: 44px; height: 44px; border: 0; border-radius: 10px;
+    background: transparent; font-size: 1.6rem; cursor: pointer; color: var(--muted);
+  }
+  .stepper button:last-child { color: var(--brand); }
+  .stepper button:hover { background: var(--surface); }
+  .stepper input {
+    width: 3.2rem; text-align: center; border: 0; background: transparent;
+    font-size: 1.35rem; font-weight: 700; padding: 0;
+  }
+  .row-actions { display: flex; gap: 10px; margin-top: 14px; }
+
+  .btn {
+    min-height: 48px; padding: 0 18px; border-radius: 14px; cursor: pointer;
+    font-weight: 600; border: 1px solid var(--line); background: var(--surface);
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    transition: transform .12s ease, background .15s ease;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn.grow { flex: 1; }
+  .btn.primary { background: var(--brand); color: var(--brand-ink); border-color: transparent; }
+  .btn.danger { color: var(--danger); }
+  .btn:hover { background: var(--surface-2); }
+  .btn.primary:hover { filter: brightness(1.12); background: var(--brand); }
+
+  /* Subject rows */
+  .list-head { display: flex; justify-content: space-between; align-items: baseline; margin: 6px 4px 10px; }
+  .list-head h2 { font-size: 1rem; margin: 0; }
+  .list-head span { color: var(--muted); font-size: .85rem; }
+
+  #subjects { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .subject {
+    display: grid;
+    grid-template-columns: 28px minmax(0,1fr) 36px;
+    grid-template-areas:
+      "n name del"
+      ".  fields fields";
+    gap: 8px 8px; align-items: center;
+    background: var(--surface-2);
+    border-radius: 16px; padding: 12px;
+    transition: opacity .25s ease, transform .25s ease;
+  }
+  .subject.leaving { opacity: 0; transform: translateX(16px); }
+  .subject .n { grid-area: n; color: var(--muted); font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; }
+  .subject .name { grid-area: name; }
+  .subject .del { grid-area: del; }
+  .subject .fields { grid-area: fields; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .field { display: grid; gap: 3px; }
+  .field > span { font-size: .78rem; color: var(--muted); padding-left: 2px; }
+  .field input, .name {
+    width: 100%; min-height: 48px; padding: 0 12px;
+    border: 1.5px solid transparent; border-radius: 12px;
+    background: var(--surface); font-size: 1.1rem;
+  }
+  .field input { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .field input:focus, .name:focus { border-color: var(--brand); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent); }
+  .field input::placeholder, .name::placeholder { color: var(--muted); opacity: .65; font-weight: 400; }
+  .field.bad input { border-color: var(--danger); background: var(--danger-bg); }
+  .del {
+    width: 36px; height: 36px; border: 0; border-radius: 10px; background: transparent;
+    color: var(--muted); font-size: 1.3rem; cursor: pointer;
+  }
+  .del:hover { background: var(--danger-bg); color: var(--danger); }
+
+  .hint { color: var(--muted); font-size: .88rem; margin: 14px 4px 0; }
+  .hint b { color: var(--ink); font-weight: 600; }
+  #status { min-height: 1.3em; margin: 10px 4px 0; font-size: .9rem; color: var(--danger); }
+
+  /* Result */
+  #result { display: none; text-align: center; padding: 28px 18px 22px; }
+  #result.show { display: block; animation: rise .35s ease both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  #result .label { color: var(--muted); font-weight: 600; margin: 0; }
+  #gpaValue {
+    font-family: var(--serif); font-weight: 700;
+    font-size: clamp(4.5rem, 24vw, 7rem); line-height: 1; margin: 6px 0 4px;
+    color: var(--brand);
+    font-variant-numeric: tabular-nums;
+  }
+  .meter { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; margin: 14px auto 0; max-width: 320px; }
+  .meter i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 99px; transition: width .6s cubic-bezier(.2,.8,.2,1); }
+  .meter-scale { display: flex; justify-content: space-between; max-width: 320px; margin: 4px auto 0; color: var(--muted); font-size: .75rem; }
+  .stats { display: flex; justify-content: center; gap: 28px; margin: 22px 0 18px; }
+  .stats div { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stats small { display: block; font-size: .78rem; font-weight: 400; color: var(--muted); }
+  .stats .pts { color: var(--ok); }
+
+  /* Dock */
+  .dock {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+    background: color-mix(in srgb, var(--surface) 92%, transparent);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-top: 1px solid var(--line);
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  }
+  .dock-inner { max-width: 560px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+  .live { min-width: 84px; }
+  .live small { display: block; color: var(--muted); font-size: .75rem; line-height: 1.1; }
+  #liveGpa { font-family: var(--serif); font-size: 1.9rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .dock .btn.primary { flex: 1; min-height: 52px; font-size: 1.05rem; border-radius: 16px; }
+  .dock .btn.danger { width: 52px; padding: 0; min-height: 52px; border-radius: 16px; }
+
+  footer { text-align: center; color: var(--muted); font-size: .8rem; margin-top: 22px; }
+  footer a { color: inherit; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom)); transform: translate(-50%, 12px);
+    background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px;
+    font-size: .9rem; opacity: 0; pointer-events: none; transition: .25s ease; z-index: 20;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (min-width: 520px) {
+    .subject {
+      grid-template-columns: 28px minmax(0,1fr) 92px 92px 36px;
+      grid-template-areas: "n name c g del";
+    }
+    .subject .fields { display: contents; }
+    .field > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    .field:nth-child(1) { grid-area: c; }
+    .field:nth-child(2) { grid-area: g; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>GPA Calculator</h1>
+    <p>Type your credits and grades on the 10-point scale. Your GPA updates as you go.</p>
+  </header>
+
+  <section class="card" aria-label="Number of subjects">
+    <div class="count">
+      <label for="numSubjects">Number of subjects</label>
+      <div class="stepper">
+        <button type="button" id="dec" aria-label="Fewer subjects">−</button>
+        <input type="text" id="numSubjects" inputmode="numeric" value="5" aria-label="Number of subjects, 1 to 20">
+        <button type="button" id="inc" aria-label="More subjects">+</button>
+      </div>
+    </div>
+    <div class="row-actions">
+      <button type="button" class="btn primary grow" id="apply">Apply</button>
+      <button type="button" class="btn grow" id="addOne">Add one</button>
+    </div>
+  </section>
+
+  <div class="list-head"><h2>Subjects</h2><span id="listMeta"></span></div>
+  <ol id="subjects"></ol>
+  <p id="status" role="status" aria-live="polite"></p>
+
+  <p class="hint"><b>Credits</b> are usually 1 to 5, decimals like 1.5 work. <b>Grade</b> is a number from 0 to 10. Subject names are optional.</p>
+
+  <section class="card" id="result" aria-live="polite">
+    <p class="label">Your GPA</p>
+    <div id="gpaValue">0.00</div>
+    <div class="meter" aria-hidden="true"><i id="meterFill"></i></div>
+    <div class="meter-scale" aria-hidden="true"><span>0</span><span>10</span></div>
+    <div class="stats">
+      <div id="statSubjects">0<small>subjects</small></div>
+      <div id="statCredits">0<small>credits</small></div>
+      <div class="pts" id="statPoints">0<small>points</small></div>
+    </div>
+    <button type="button" class="btn" id="copy">Copy result</button>
+  </section>
+
+  <footer>Works offline. Your entries are saved on this device only.</footer>
+</div>
+
+<div class="dock">
+  <div class="dock-inner">
+    <div class="live"><small>Live GPA</small><div id="liveGpa">—</div></div>
+    <button type="button" class="btn primary" id="calc">Calculate</button>
+    <button type="button" class="btn danger" id="clear" aria-label="Clear all subjects">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 10v6M14 10v6"/></svg>
+    </button>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+  const MAX_SUBJECTS = 20, MAX_CREDITS = 10, MAX_GRADE = 10;
+  const KEY = 'gpa-calculator:v2';
+  const $ = id => document.getElementById(id);
+  const list = $('subjects');
+
+  /* ---------- helpers ---------- */
+  const clean = v => {                       // digits and a single dot only
+    v = v.replace(',', '.').replace(/[^0-9.]/g, '');
+    const i = v.indexOf('.');
+    return i === -1 ? v : v.slice(0, i + 1) + v.slice(i + 1).replace(/\./g, '');
+  };
+  const num = v => (v === '' || v === '.') ? NaN : parseFloat(v);
+  const fmt = n => Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, '');
+  let toastTimer;
+  const toast = msg => {
+    const t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+  };
+
+  /* ---------- rows ---------- */
+  function addRow(data = {}) {
+    const li = document.createElement('li');
+    li.className = 'subject';
+    li.innerHTML = `
+      <span class="n"></span>
+      <input class="name" type="text" maxlength="40" autocomplete="off" aria-label="Subject name">
+      <div class="fields">
+        <label class="field"><span>Credits</span>
+          <input class="credits" type="text" inputmode="decimal" autocomplete="off" placeholder="Credits"></label>
+        <label class="field"><span>Grade</span>
+          <input class="grade" type="text" inputmode="decimal" autocomplete="off" placeholder="Grade 0–10"></label>
+      </div>
+      <button type="button" class="del" aria-label="Remove subject">−</button>`;
+    li.querySelector('.name').value = data.name || '';
+    li.querySelector('.credits').value = data.credits ?? '3';
+    li.querySelector('.grade').value = data.grade ?? '';
+    list.appendChild(li);
+    renumber();
+    return li;
+  }
+
+  function renumber() {
+    [...list.children].forEach((li, i) => {
+      li.querySelector('.n').textContent = i + 1;
+      li.querySelector('.name').placeholder = 'Subject ' + (i + 1);
+    });
+    $('listMeta').textContent = list.children.length + (list.children.length === 1 ? ' subject' : ' subjects');
+  }
+
+  function readRows() {
+    return [...list.children].map(li => ({
+      li,
+      name: li.querySelector('.name').value,
+      cRaw: li.querySelector('.credits').value,
+      gRaw: li.querySelector('.grade').value,
+    }));
+  }
+
+  /* ---------- calculation (credit-weighted average, same as before) ---------- */
+  function compute() {
+    let points = 0, credits = 0, used = 0, bad = 0, incomplete = 0;
+    readRows().forEach(r => {
+      const c = num(r.cRaw), g = num(r.gRaw);
+      const cBad = r.cRaw !== '' && (isNaN(c) || c > MAX_CREDITS);
+      const gBad = r.gRaw !== '' && (isNaN(g) || g > MAX_GRADE);
+      r.li.querySelector('.credits').parentElement.classList.toggle('bad', cBad);
+      r.li.querySelector('.grade').parentElement.classList.toggle('bad', gBad);
+      if (cBad || gBad) { bad++; return; }
+      if (isNaN(c) || isNaN(g)) { if (r.cRaw !== '' || r.gRaw !== '') incomplete++; return; }
+      if (c > 0) { points += c * g; credits += c; used++; }
+    });
+    return { points, credits, used, bad, incomplete, gpa: credits ? points / credits : null };
+  }
+
+  function refresh() {
+    const r = compute();
+    $('liveGpa').textContent = r.gpa === null ? '—' : r.gpa.toFixed(2);
+    const s = $('status');
+    if (r.bad) s.textContent = `Fix ${r.bad} highlighted ${r.bad === 1 ? 'entry' : 'entries'}: credits go up to ${MAX_CREDITS}, grades from 0 to ${MAX_GRADE}.`;
+    else if (r.incomplete) s.textContent = `${r.incomplete} ${r.incomplete === 1 ? 'subject needs' : 'subjects need'} both credits and a grade to count.`;
+    else s.textContent = '';
+    save();
+    return r;
+  }
+
+  function calculate() {
+    const r = refresh();
+    if (!r.credits) {
+      toast('Enter credits and a grade for at least one subject');
+      const firstEmpty = list.querySelector('.grade');
+      if (firstEmpty) firstEmpty.focus();
+      return;
+    }
+    $('gpaValue').textContent = r.gpa.toFixed(2);
+    $('statSubjects').firstChild.nodeValue = r.used;
+    $('statCredits').firstChild.nodeValue = fmt(r.credits);
+    $('statPoints').firstChild.nodeValue = r.points.toFixed(1);
+    $('meterFill').style.width = '0';
+    $('result').classList.add('show');
+    requestAnimationFrame(() => requestAnimationFrame(() => { $('meterFill').style.width = (r.gpa / MAX_GRADE * 100) + '%'; }));
+    $('result').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    lastResult = `GPA ${r.gpa.toFixed(2)} (${r.used} subjects, ${fmt(r.credits)} credits, ${r.points.toFixed(1)} points)`;
+  }
+  let lastResult = '';
+
+  /* ---------- subject count ---------- */
+  const countEl = $('numSubjects');
+  const clampCount = () => {
+    let n = parseInt(countEl.value, 10);
+    if (isNaN(n)) n = 5;
+    countEl.value = Math.max(1, Math.min(MAX_SUBJECTS, n));
+    return +countEl.value;
+  };
+  $('dec').onclick = () => { countEl.value = clampCount() - 1; clampCount(); };
+  $('inc').onclick = () => { countEl.value = clampCount() + 1; clampCount(); };
+  countEl.addEventListener('input', () => { countEl.value = countEl.value.replace(/\D/g, '').slice(0, 2); });
+  countEl.addEventListener('blur', clampCount);
+
+  $('apply').onclick = () => {
+    const n = clampCount();
+    list.innerHTML = '';
+    for (let i = 0; i < n; i++) addRow();
+    $('result').classList.remove('show');
+    refresh();
+  };
+  $('addOne').onclick = () => {
+    if (list.children.length >= MAX_SUBJECTS) return toast(`Up to ${MAX_SUBJECTS} subjects`);
+    const li = addRow();
+    countEl.value = list.children.length;
+    li.querySelector('.name').focus({ preventScroll: true });
+    li.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    refresh();
+  };
+
+  /* ---------- events ---------- */
+  list.addEventListener('input', e => {
+    if (e.target.matches('.credits, .grade')) e.target.value = clean(e.target.value);
+    refresh();
+  });
+  list.addEventListener('focusin', e => { if (e.target.matches('.credits, .grade')) e.target.select(); });
+  list.addEventListener('click', e => {
+    const btn = e.target.closest('.del'); if (!btn) return;
+    const li = btn.closest('.subject');
+    li.classList.add('leaving');
+    setTimeout(() => { li.remove(); renumber(); countEl.value = Math.max(1, list.children.length); refresh(); }, 250);
+  });
+
+  $('calc').onclick = calculate;
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.target.closest('button')) { e.preventDefault(); calculate(); }
+  });
+  $('clear').onclick = () => {
+    if (!confirm('Clear all subjects?')) return;
+    list.innerHTML = ''; renumber();
+    $('result').classList.remove('show');
+    refresh();
+  };
+  $('copy').onclick = async () => {
+    try { await navigator.clipboard.writeText(lastResult); toast('Copied'); }
+    catch { toast('Copy not available here'); }
+  };
+
+  /* ---------- autosave ---------- */
+  function save() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(readRows().map(r => ({ name: r.name, credits: r.cRaw, grade: r.gRaw }))));
+    } catch {}
+  }
+  function load() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(KEY));
+      if (Array.isArray(saved) && saved.length) { saved.slice(0, MAX_SUBJECTS).forEach(addRow); countEl.value = list.children.length; return; }
+    } catch {}
+    for (let i = 0; i < clampCount(); i++) addRow();
+  }
+
+  load();
+  refresh();
+})();
+</script>
+</body>
+</html>
